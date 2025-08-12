@@ -1,3 +1,6 @@
+///////////////////////////////
+// internal/gateway/gateway.go
+
 package gateway
 
 import (
@@ -5,24 +8,25 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+
 	"strconv"
 
 	"wb_tech_level_zero/internal/config"
-	"wb_tech_level_zero/internal/orders"
+	httpapi "wb_tech_level_zero/internal/delivery/http"
 	"wb_tech_level_zero/pkg/logger"
 
 	"go.uber.org/zap"
 )
 
-type Gateway struct {
-	httpServer *http.Server
+type Server struct {
+	cfg           *config.Config
+	httpServer    *http.Server
+	ordersHandler *httpapi.Handlers
 }
 
-func New(
-	ctx context.Context,
-	cfg *config.Config,
-	ordersHandler *orders.OrdersHandler,
-) (*Gateway, error) {
+func NewServer(ctx context.Context, cfg *config.Config, orderService httpapi.OrdersService) (*Server, error) {
+
+	ordersHandler := httpapi.NewHandlers(cfg, orderService)
 
 	r := NewRouter(ctx, ordersHandler)
 
@@ -35,12 +39,14 @@ func New(
 		return ctx
 	}
 
-	return &Gateway{
-		httpServer: httpServer,
+	return &Server{
+		httpServer:    httpServer,
+		ordersHandler: ordersHandler,
+		cfg:           cfg,
 	}, nil
 }
 
-func (gtw *Gateway) Run(ctx context.Context) error {
+func (gtw *Server) Run(ctx context.Context) error {
 	log := logger.GetLoggerFromCtx(ctx)
 	log.Info(ctx, "HTTP server is starting to listen")
 
@@ -55,7 +61,7 @@ func (gtw *Gateway) Run(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gateway) Shutdown(ctx context.Context) error {
+func (g *Server) Shutdown(ctx context.Context) error {
 	log := logger.GetLoggerFromCtx(ctx)
 	log.Info(ctx, "HTTP server shutdown process initiated")
 	if g.httpServer != nil {

@@ -1,15 +1,16 @@
-package orders
+package httpapi
 
 import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"wb_tech_level_zero/internal/dto"
 	"wb_tech_level_zero/pkg/logger"
 
 	"go.uber.org/zap"
 )
 
-func (h *OrdersHandler) writeJSONResponse(ctx context.Context, w http.ResponseWriter, statusCode int, data interface{}) {
+func (h *Handlers) writeJSONResponse(ctx context.Context, w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
@@ -24,10 +25,10 @@ func (h *OrdersHandler) writeJSONResponse(ctx context.Context, w http.ResponseWr
 	}
 }
 
-func (h *OrdersHandler) writeErrorResponse(ctx context.Context, w http.ResponseWriter, statusCode int, message string) {
+func (h *Handlers) writeErrorResponse(ctx context.Context, w http.ResponseWriter, statusCode int, message string) {
 	// log := logger.GetLoggerFromCtx(ctx)
 	// log.Info(ctx, message)
 
-	response := ErrorResponse{Message: message}
+	response := dto.ErrorResponse{Message: message}
 	h.writeJSONResponse(ctx, w, statusCode, response)
 }

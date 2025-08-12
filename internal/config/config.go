@@ -15,6 +15,10 @@ type Config struct {
 	PostgresDB       string `env:"POSTGRES_DB" env-default:"wbdb"`
 
 	DefaultPageLimit int `env:"DEFAULT_PAGE_LIMIT" env-default:"50"`
+
+	KafkaBroker  string `env:"KAFKA_BROKER" envDefault:"localhost:9094"`
+	KafkaTopic   string `env:"KAFKA_TOPIC" envDefault:"orders"`
+	KafkaGroupID string `env:"KAFKA_GROUP_ID" envDefault:"order-consumer"`
 }
 
 func New() *Config {

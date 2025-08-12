@@ -1,13 +1,9 @@
-package orders
+package dto
 
 import (
 	"time"
+	"wb_tech_level_zero/internal/orders"
 )
-
-type GetOrdersRequest struct {
-	Page  int
-	Limit int
-}
 
 type OrderDTO struct {
 	// ID          uuid.UUID `json:"id"`
@@ -67,11 +63,52 @@ type ItemDTO struct {
 }
 
 type OrdersResponse struct {
-	Orders []*OrderDTO `json:"orders"`
-	Total  int         `json:"total"`
-	Page   int         `json:"page"`
+	Orders []OrderDTO `json:"orders"`
+	Total  int        `json:"total"`
+	Page   int        `json:"page"`
+	Limit  int        `json:"limit"`
 }
 
 type ErrorResponse struct {
 	Message string `json:"message" example:"An unexpected error occurred."`
+}
+
+///////////////////
+
+func ItemsToDTO(items []orders.Item) []ItemDTO {
+	result := make([]ItemDTO, 0, len(items))
+	for _, i := range items {
+		result = append(result, ItemDTO{
+			ChrtID:      i.ChrtID,
+			TrackNumber: i.TrackNumber,
+			Price:       i.Price,
+			Rid:         i.Rid,
+			Name:        i.Name,
+			Sale:        i.Sale,
+			Size:        i.Size,
+			TotalPrice:  i.TotalPrice,
+			NmID:        i.NmID,
+			Brand:       i.Brand,
+			Status:      i.Status,
+		})
+	}
+	return result
+}
+func OrderToDTO(o *orders.Order) OrderDTO {
+	return OrderDTO{
+		OrderUID:          o.OrderUID,
+		TrackNumber:       o.TrackNumber,
+		Entry:             o.Entry,
+		Delivery:          DeliveryDTO(o.Delivery),
+		Payment:           PaymentDTO(o.Payment),
+		Items:             ItemsToDTO(o.Items),
+		Locale:            o.Locale,
+		InternalSignature: o.InternalSignature,
+		CustomerID:        o.CustomerID,
+		DeliveryService:   o.DeliveryService,
+		Shardkey:          o.Shardkey,
+		SmID:              o.SmID,
+		DateCreated:       o.DateCreated,
+		OofShard:          o.OofShard,
+	}
 }

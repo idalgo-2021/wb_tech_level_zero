@@ -1,3 +1,7 @@
+//////////////////
+
+// internal/api/routes.go
+
 package gateway
 
 import (
@@ -6,8 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"wb_tech_level_zero/internal/orders"
-
+	httpapi "wb_tech_level_zero/internal/delivery/http"
 	"wb_tech_level_zero/pkg/logger"
 
 	"go.uber.org/zap"
@@ -16,7 +19,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-func NewRouter(ctx context.Context, ordersHandler *orders.OrdersHandler) *mux.Router {
+func NewRouter(ctx context.Context, ordersHandler *httpapi.Handlers) *mux.Router {
 
 	r := mux.NewRouter()
 	r.Use(requestContextMiddleware)

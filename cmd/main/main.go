@@ -1,24 +1,20 @@
-// main.go
+///////////////////////
+
+// cmd/main/main.go
 package main
 
 import (
 	"context"
 	"log"
-	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 
+	"wb_tech_level_zero/internal/app"
 	"wb_tech_level_zero/internal/config"
-	"wb_tech_level_zero/internal/gateway"
-	"wb_tech_level_zero/pkg/db"
-
-	"wb_tech_level_zero/internal/orders"
-
 	appLogger "wb_tech_level_zero/pkg/logger"
 )
 
@@ -27,8 +23,6 @@ const (
 )
 
 func main() {
-
-	// Base logger
 	bootstrapLogger, err := zap.NewProduction()
 	if err != nil {
 		log.Fatalf("failed to initialize zap logger: %v", err)
@@ -45,63 +39,27 @@ func main() {
 	}
 	bootstrapLogger.Info("Configuration loaded")
 
-	// Main context
-	ctx, cancel := context.WithCancel(context.Background())
+	logger := appLogger.New(bootstrapLogger, serviceName)
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	application, err := app.New(ctx, cfg, logger)
+	if err != nil {
+		logger.Fatal(ctx, "failed to init app", zap.Error(err))
+	}
+
+	if err := application.Run(ctx); err != nil {
+		logger.Fatal(ctx, "failed to start app", zap.Error(err))
+	}
+
+	<-ctx.Done()
+	logger.Info(ctx, "Shutting down gracefully...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	pgCfg := db.PostgresConfig{
-		Host:     cfg.PostgresHost,
-		Port:     cfg.PostgresPort,
-		User:     cfg.PostgresUser,
-		Password: cfg.PostgresPassword,
-		DBName:   cfg.PostgresDB,
-	}
-	pgPool, err := db.NewPostgresPool(ctx, pgCfg)
-	if err != nil {
-		bootstrapLogger.Fatal("failed to connect to Postgres", zap.Error(err))
-	}
-	defer pgPool.Close()
-	bootstrapLogger.Info("Database connection pool established")
-
-	// Orders
-	ordersRepository := orders.NewPgOrdersRepository(pgPool)
-	ordersService := orders.NewOrdersService(ordersRepository, cfg)
-	ordersHandler := orders.NewOrdersHandler(ordersService, cfg)
-	bootstrapLogger.Info("Orders services created")
-
-	// Customs logger(adding serviceName and requestID in log)
-	requestLogger := appLogger.New(bootstrapLogger, serviceName)
-	ctx = context.WithValue(ctx, appLogger.LoggerKey, requestLogger)
-
-	// GATEWAY
-	gtw, err := gateway.New(ctx, cfg, ordersHandler)
-	if err != nil {
-		bootstrapLogger.Fatal("failed to init gateway", zap.Error(err))
-	}
-
-	// APP start
-	graceCh := make(chan os.Signal, 1)
-	signal.Notify(graceCh, syscall.SIGINT, syscall.SIGTERM)
-
-	runLogger := appLogger.GetLoggerFromCtx(ctx)
-
-	go func() {
-		runLogger.Info(ctx, "Starting server...", zap.String("address", cfg.HTTPServerAddress+":"+strconv.Itoa(cfg.HTTPServerPort)))
-		if err := gtw.Run(ctx); err != nil {
-			runLogger.Error(ctx, "gateway server stopped with error", zap.Error(err))
-		}
-		cancel()
-	}()
-
-	<-graceCh
-	runLogger.Info(ctx, "Shutting down gracefully...")
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-
-	if err := gtw.Shutdown(shutdownCtx); err != nil {
-		runLogger.Error(ctx, "failed to shutdown gateway gracefully", zap.Error(err))
-	} else {
-		runLogger.Info(ctx, "Shutdown completed.")
+	if err := application.Stop(shutdownCtx); err != nil {
+		logger.Error(ctx, "shutdown error", zap.Error(err))
 	}
 }

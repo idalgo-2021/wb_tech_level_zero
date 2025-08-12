@@ -1,4 +1,6 @@
-package models
+// internal/orders/models.go
+
+package orders
 
 import (
 	"time"

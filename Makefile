@@ -3,20 +3,49 @@ COMPOSE_FLAGS = --env-file $(ENV_FILE_PATH)
 COMPOSE_DB_FILE = -f docker-compose.yaml
 PGDATA_DIR := ./pgdata
 
+# =============================================================================
+# БАЗА ДАННЫХ
+# =============================================================================
+
 ## db-up: Запустить ТОЛЬКО базу данных для локальной отладки
 db-up:
-##	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) up -d db
-	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) up -d
+	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) up -d db
 
 ## db-down: Остановить контейнер с базой данных для отладки
 db-down:
-##	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) down db
-	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) down
+	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) down db
 
 ## db-logs: Показать логи базы данных для отладки
 db-logs:
-##	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) logs -f db
-	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) logs -f
+	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) logs -f db
+
+# =============================================================================
+# KAFKA
+# =============================================================================
+
+## kafka-up: Запустить только Kafka и Kafka UI
+kafka-up:
+	docker compose $(COMPOSE_DB_FILE) up -d kafka kafka-ui
+
+## kafka-down: Остановить Kafka и Kafka UI
+kafka-down:
+	docker compose $(COMPOSE_DB_FILE) down kafka kafka-ui
+
+## kafka-logs: Показать логи Kafka
+kafka-logs:
+	docker compose $(COMPOSE_DB_FILE) logs -f kafka
+
+# =============================================================================
+# ВСЁ ОКРУЖЕНИЕ
+# =============================================================================
+
+## up: Запустить все сервисы (Postgres + Kafka + Kafka UI)
+up:
+	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) up -d
+
+## down: Остановить все сервисы
+down:
+	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) down
 
 # =============================================================================
 # КОМАНДЫ ОЧИСТКИ
@@ -30,9 +59,9 @@ prune:
 clean:
 	@read -p "⚠ Это удалит ВСЕ данные из $(PGDATA_DIR). Продолжить? [y/N] " confirm && \
 	if [ "$$confirm" = "y" ]; then \
-		docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) down -v db && \
+		docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) down -v && \
 		sudo rm -rf $(PGDATA_DIR) && \
-		echo "✅ Контейнер и данные БД удалены."; \
+		echo "✅ Контейнеры и данные удалены."; \
 	else \
 		echo "❌ Отменено."; \
 	fi
