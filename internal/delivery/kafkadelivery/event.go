@@ -1,17 +1,31 @@
+////////////////////////////
+// internal/delivery/kafkadelivery/event.go
+
 package kafkadelivery
 
 import (
 	"encoding/json"
-	"errors"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
+
+var validate *validator.Validate
+
+func init() {
+	validate = validator.New()
+
+	// ... customs validators
+}
+
+/////////////
 
 type EventOrder struct {
 	OrderUID          string    `json:"order_uid" validate:"required"`
 	TrackNumber       string    `json:"track_number" validate:"required"`
 	Entry             string    `json:"entry" validate:"required"`
-	Delivery          Delivery  `json:"delivery" validate:"required,dive"`
-	Payment           Payment   `json:"payment" validate:"required,dive"`
+	Delivery          Delivery  `json:"delivery" validate:"required"`
+	Payment           Payment   `json:"payment" validate:"required"`
 	Items             []Item    `json:"items" validate:"required,min=1,dive"`
 	Locale            string    `json:"locale"`
 	InternalSignature string    `json:"internal_signature"`
@@ -60,14 +74,16 @@ type Item struct {
 	Status      int    `json:"status"`
 }
 
+/////////////
+
 func ParseAndValidate(data []byte) (*EventOrder, error) {
 	var eo EventOrder
 	if err := json.Unmarshal(data, &eo); err != nil {
 		return nil, err
 	}
 
-	if eo.OrderUID == "" {
-		return nil, errors.New("order_uid is required")
+	if err := validate.Struct(eo); err != nil {
+		return nil, err
 	}
 
 	return &eo, nil

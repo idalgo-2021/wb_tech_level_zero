@@ -33,9 +33,9 @@ func main() {
 		bootstrapLogger.Warn(".env file not found or cannot be read, relying on environment variables")
 	}
 
-	cfg := config.New()
-	if cfg == nil {
-		bootstrapLogger.Fatal("failed to load application configuration")
+	cfg, err := config.New()
+	if err != nil {
+		bootstrapLogger.Fatal("failed to load application configuration", zap.Error(err))
 	}
 	bootstrapLogger.Info("Configuration loaded")
 

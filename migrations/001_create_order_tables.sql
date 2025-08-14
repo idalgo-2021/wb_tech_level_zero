@@ -1,7 +1,6 @@
--- Создаем расширение для генерации UUID, если оно еще не создано
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Таблица заказов
+-- Заказы
 CREATE TABLE orders (
     id SERIAL PRIMARY KEY,
     order_uid TEXT UNIQUE NOT NULL,
@@ -17,7 +16,7 @@ CREATE TABLE orders (
     oof_shard TEXT
 );
 
--- Таблица доставки
+-- Доставка
 CREATE TABLE deliveries (
     id SERIAL PRIMARY KEY,
     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -30,7 +29,7 @@ CREATE TABLE deliveries (
     email TEXT
 );
 
--- Таблица оплаты
+-- Оплата
 CREATE TABLE payments (
     id SERIAL PRIMARY KEY,
     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -46,7 +45,7 @@ CREATE TABLE payments (
     custom_fee NUMERIC(12,2)
 );
 
--- Таблица товаров
+-- Номенклатура заказа
 CREATE TABLE items (
     id SERIAL PRIMARY KEY,
     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -63,7 +62,7 @@ CREATE TABLE items (
     status INTEGER
 );
 
--- Индексы для ускорения поиска
+
 CREATE INDEX idx_orders_order_uid ON orders(order_uid);
 CREATE INDEX idx_items_order_id ON items(order_id);
 CREATE INDEX idx_payments_order_id ON payments(order_id);

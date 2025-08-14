@@ -16,16 +16,20 @@ type Config struct {
 
 	DefaultPageLimit int `env:"DEFAULT_PAGE_LIMIT" env-default:"50"`
 
-	KafkaBroker  string `env:"KAFKA_BROKER" envDefault:"localhost:9094"`
-	KafkaTopic   string `env:"KAFKA_TOPIC" envDefault:"orders"`
-	KafkaGroupID string `env:"KAFKA_GROUP_ID" envDefault:"order-consumer"`
+	KafkaBroker        string `env:"KAFKA_BROKER" env-default:"localhost:9094"`
+	KafkaTopic         string `env:"KAFKA_TOPIC" env-default:"orders"`
+	KafkaGroupID       string `env:"KAFKA_GROUP_ID" env-default:"order-consumer"`
+	KafkaConsumerCount int    `env:"KAFKA_CONSUMER_COUNT" env-default:"2"`
+
+	KafkaMaxRetries   int    `env:"KAFKA_MAX_RETRIES" env-default:"3"`
+	KafkaRetryDelayMs int    `env:"KAFKA_RETRY_DELAY_MS" env-default:"600"`
+	KafkaTopicDLQ     string `env:"KAFKA_DLQ_TOPIC" env-default:"orders-dlq"`
 }
 
-func New() *Config {
+func New() (*Config, error) {
 	cfg := Config{}
-	err := cleanenv.ReadEnv(&cfg)
-	if err != nil {
-		return nil
+	if err := cleanenv.ReadEnv(&cfg); err != nil {
+		return nil, err
 	}
-	return &cfg
+	return &cfg, nil
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"wb_tech_level_zero/pkg/logger"
 
@@ -16,17 +17,25 @@ import (
 )
 
 type KafkaConfig struct {
-	Brokers []string
-	GroupID string
-	Topic   string
+	Brokers      []string
+	GroupID      string
+	Topic        string
+	ConsumerCnt  int
+	MaxRetries   int
+	RetryDelayMs int
+	TopicDLQ     string
 }
 
 type Consumer struct {
-	reader  *kafkaGo.Reader
-	handler MessageHandler
-	logger  logger.Logger
-	wg      sync.WaitGroup
-	closed  bool
+	reader       *kafkaGo.Reader
+	handler      MessageHandler
+	logger       logger.Logger
+	wg           sync.WaitGroup
+	closed       bool
+	consumerCnt  int
+	MaxRetries   int
+	RetryDelayMs int
+	TopicDLQ     string
 }
 
 type MessageHandler interface {
@@ -43,14 +52,18 @@ func NewConsumer(cfg KafkaConfig, handler MessageHandler, logger logger.Logger) 
 	})
 
 	return &Consumer{
-		reader:  r,
-		handler: handler,
-		logger:  logger,
+		reader:       r,
+		handler:      handler,
+		logger:       logger,
+		consumerCnt:  cfg.ConsumerCnt,
+		MaxRetries:   cfg.MaxRetries,
+		RetryDelayMs: cfg.RetryDelayMs,
+		TopicDLQ:     cfg.TopicDLQ,
 	}
 }
 
-func (c *Consumer) Start(ctx context.Context, workers int) error {
-	for i := 0; i < workers; i++ {
+func (c *Consumer) Start(ctx context.Context) error {
+	for i := 0; i < c.consumerCnt; i++ {
 		c.wg.Add(1)
 		go func(workerID int) {
 			defer c.wg.Done()
@@ -66,9 +79,9 @@ func (c *Consumer) Start(ctx context.Context, workers int) error {
 					continue
 				}
 
-				if err := c.handler.HandleMessage(ctx, msg); err != nil {
-					c.logger.Error(ctx, fmt.Sprintf("Worker %d failed to handle message", workerID), zap.Error(err))
-					// Retry, DLQ ....
+				// msg processing
+				if err := c.processMessageWithRetry(ctx, msg); err != nil {
+					continue
 				}
 
 				if err := c.reader.CommitMessages(ctx, msg); err != nil {
@@ -78,6 +91,48 @@ func (c *Consumer) Start(ctx context.Context, workers int) error {
 		}(i)
 	}
 	return nil
+}
+
+func (c *Consumer) processMessageWithRetry(ctx context.Context, msg kafkaGo.Message) error {
+	var err error
+	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
+		err = c.handler.HandleMessage(ctx, msg)
+		if err == nil {
+			return nil // success
+		}
+
+		if attempt < c.MaxRetries {
+			delay := c.RetryDelayMs * (attempt + 1)
+			c.logger.Warn(ctx, fmt.Sprintf("Retry %d for message, sleeping %d ms", attempt+1, delay), zap.Error(err))
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Duration(delay) * time.Millisecond):
+				continue
+			}
+		} else {
+			// send to DLQ
+			c.logger.Error(ctx, "Sending message to DLQ after retries", zap.Error(err))
+			if dlqErr := c.sendToDLQ(ctx, msg); dlqErr != nil {
+				c.logger.Error(ctx, "Failed to send message to DLQ", zap.Error(dlqErr))
+			}
+			return err
+		}
+	}
+	return err
+}
+
+func (c *Consumer) sendToDLQ(ctx context.Context, msg kafkaGo.Message) error {
+	writer := kafkaGo.NewWriter(kafkaGo.WriterConfig{
+		Brokers: c.reader.Config().Brokers,
+		Topic:   c.TopicDLQ,
+	})
+	defer writer.Close()
+
+	return writer.WriteMessages(ctx, kafkaGo.Message{
+		Key:   msg.Key,
+		Value: msg.Value,
+	})
 }
 
 func (c *Consumer) Close() error {

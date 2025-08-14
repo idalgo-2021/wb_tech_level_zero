@@ -56,9 +56,13 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*App, e
 
 	kafkaHandler := kafkadelivery.NewHandler(orderService, logger)
 	kafkaCfg := kafkadelivery.KafkaConfig{
-		Brokers: strings.Split(cfg.KafkaBroker, ","),
-		GroupID: cfg.KafkaGroupID,
-		Topic:   cfg.KafkaTopic,
+		Brokers:      strings.Split(cfg.KafkaBroker, ","),
+		GroupID:      cfg.KafkaGroupID,
+		Topic:        cfg.KafkaTopic,
+		ConsumerCnt:  cfg.KafkaConsumerCount,
+		MaxRetries:   cfg.KafkaMaxRetries,
+		RetryDelayMs: cfg.KafkaRetryDelayMs,
+		TopicDLQ:     cfg.KafkaTopicDLQ,
 	}
 	kafkaConsumer := kafkadelivery.NewConsumer(kafkaCfg, kafkaHandler, logger)
 
@@ -72,11 +76,13 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*App, e
 }
 
 func (a *App) Run(ctx context.Context) error {
+	ctx = logger.ContextWithLogger(ctx, a.logger)
+
 	a.wg.Add(1)
 	go func() {
 		defer a.wg.Done()
 		a.logger.Info(ctx, "Starting Kafka consumer...")
-		if err := a.kafkaConsumer.Start(ctx, 3); err != nil {
+		if err := a.kafkaConsumer.Start(ctx); err != nil {
 			a.logger.Error(ctx, "Kafka consumer failed", zap.Error(err))
 		}
 	}()

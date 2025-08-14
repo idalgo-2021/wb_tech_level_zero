@@ -75,7 +75,8 @@ func main() {
 	defer writer.Close()
 
 	order := Order{
-		OrderUID:    "b563feb7b2b84b6test",
+		// OrderUID:    "b563feb7b2b84b6test",
+		OrderUID:    "",
 		TrackNumber: "WBILMTESTTRACK",
 		Entry:       "WBIL",
 		Delivery: Delivery{

@@ -23,6 +23,7 @@ type Logger interface {
 	Error(ctx context.Context, msg string, fields ...zap.Field)
 	Warn(ctx context.Context, msg string, fields ...zap.Field)
 	Fatal(ctx context.Context, msg string, fields ...zap.Field)
+	// Debug(ctx context.Context, msg string, fields ...zap.Field)
 }
 
 type logger struct {
@@ -59,6 +60,11 @@ func (l *logger) Fatal(ctx context.Context, msg string, fields ...zap.Field) {
 	allFields := l.addStandardFields(ctx, fields...)
 	l.logger.Fatal(msg, allFields...)
 }
+
+// func (l *logger) Debug(ctx context.Context, msg string, fields ...zap.Field) {
+// 	allFields := l.addStandardFields(ctx, fields...)
+// 	l.logger.Debug(msg, allFields...)
+// }
 
 func (l *logger) addStandardFields(ctx context.Context, fields ...zap.Field) []zap.Field {
 	standardFields := make([]zap.Field, 0, 2+len(fields))
