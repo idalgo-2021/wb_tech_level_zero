@@ -1,6 +1,3 @@
-///////////////////////
-
-// cmd/main/main.go
 package main
 
 import (
@@ -13,6 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 
+	_ "wb_tech_level_zero/docs"
 	"wb_tech_level_zero/internal/app"
 	"wb_tech_level_zero/internal/config"
 	appLogger "wb_tech_level_zero/pkg/logger"
@@ -22,6 +20,10 @@ const (
 	serviceName = "wb_tech"
 )
 
+// @title wb_techschool 'Orders API'
+// @version 1.0
+// @description orders API
+// @BasePath /
 func main() {
 	bootstrapLogger, err := zap.NewProduction()
 	if err != nil {

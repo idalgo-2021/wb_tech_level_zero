@@ -14,6 +14,13 @@ type Config struct {
 	PostgresPassword string `env:"POSTGRES_PASSWORD" env-default:"pgpass"`
 	PostgresDB       string `env:"POSTGRES_DB" env-default:"wbdb"`
 
+	RedisHost     string `env:"REDIS_HOST" env-default:"localhost"`
+	RedisPort     int    `env:"REDIS_PORT" env-default:"6379"`
+	RedisPassword string `env:"REDIS_PASSWORD" env-default:""`
+	RedisDB       int    `env:"REDIS_DB" env-default:"0"`
+
+	OrderTTLMinutes int `env:"ORDER_CACHE_TTL_MINUTES" env-default:"5"`
+
 	DefaultPageLimit int `env:"DEFAULT_PAGE_LIMIT" env-default:"50"`
 
 	KafkaBroker        string `env:"KAFKA_BROKER" env-default:"localhost:9094"`

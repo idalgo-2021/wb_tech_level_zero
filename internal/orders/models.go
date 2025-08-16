@@ -1,5 +1,3 @@
-// internal/orders/models.go
-
 package orders
 
 import (

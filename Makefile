@@ -36,10 +36,27 @@ kafka-logs:
 	docker compose $(COMPOSE_DB_FILE) logs -f kafka
 
 # =============================================================================
+# REDIS
+# =============================================================================
+
+## redis-up: Запустить только Redis
+redis-up:
+	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) up -d redis
+
+## redis-down: Остановить Redis
+redis-down:
+	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) down redis
+
+## redis-logs: Показать логи Redis
+redis-logs:
+	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) logs -f redis
+
+
+# =============================================================================
 # ВСЁ ОКРУЖЕНИЕ
 # =============================================================================
 
-## up: Запустить все сервисы (Postgres + Kafka + Kafka UI)
+## up: Запустить все сервисы (Postgres + Kafka + Kafka UI + Redis)
 up:
 	docker compose $(COMPOSE_DB_FILE) $(COMPOSE_FLAGS) up -d
 

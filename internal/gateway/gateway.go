@@ -1,6 +1,3 @@
-///////////////////////////////
-// internal/gateway/gateway.go
-
 package gateway
 
 import (

@@ -1,3 +1,9 @@
+/////////////////////////////////////
+//
+// Утилита для создания и отправки сообщения в топик Kafka
+//
+/////////////////////////////////////
+
 package main
 
 import (
@@ -75,8 +81,8 @@ func main() {
 	defer writer.Close()
 
 	order := Order{
-		// OrderUID:    "b563feb7b2b84b6test",
-		OrderUID:    "",
+		OrderUID: "b563feb7b2b84b6trst",
+		// OrderUID:    "",
 		TrackNumber: "WBILMTESTTRACK",
 		Entry:       "WBIL",
 		Delivery: Delivery{

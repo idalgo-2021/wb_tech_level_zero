@@ -1,6 +1,3 @@
-//
-// consumer.go
-
 package kafkadelivery
 
 import (
@@ -96,10 +93,19 @@ func (c *Consumer) Start(ctx context.Context) error {
 func (c *Consumer) processMessageWithRetry(ctx context.Context, msg kafkaGo.Message) error {
 	var err error
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
+
 		err = c.handler.HandleMessage(ctx, msg)
 		if err == nil {
-			return nil // success
+			return c.commit(ctx, msg)
 		}
+
+		if errors.Is(err, ErrKafkaNonRetryable) {
+			c.logger.Warn(ctx, "Non-retryable error, sending to DLQ", zap.Error(err))
+			c.sendToDLQAndCommit(ctx, msg)
+			return nil
+		}
+
+		// ALL Not ErrKafkaNonRetryable errors
 
 		if attempt < c.MaxRetries {
 			delay := c.RetryDelayMs * (attempt + 1)
@@ -110,16 +116,30 @@ func (c *Consumer) processMessageWithRetry(ctx context.Context, msg kafkaGo.Mess
 			case <-time.After(time.Duration(delay) * time.Millisecond):
 				continue
 			}
-		} else {
-			// send to DLQ
-			c.logger.Error(ctx, "Sending message to DLQ after retries", zap.Error(err))
-			if dlqErr := c.sendToDLQ(ctx, msg); dlqErr != nil {
-				c.logger.Error(ctx, "Failed to send message to DLQ", zap.Error(dlqErr))
-			}
-			return err
 		}
 	}
+
+	c.logger.Error(ctx, "Max retries exceeded, sending to DLQ", zap.Error(err))
+	c.sendToDLQAndCommit(ctx, msg)
+
 	return err
+}
+
+func (c *Consumer) commit(ctx context.Context, msg kafkaGo.Message) error {
+	if commitErr := c.reader.CommitMessages(ctx, msg); commitErr != nil {
+		c.logger.Error(ctx, "Failed to commit message", zap.Error(commitErr))
+		return commitErr
+	}
+	return nil
+}
+
+func (c *Consumer) sendToDLQAndCommit(ctx context.Context, msg kafkaGo.Message) {
+	if dlqErr := c.sendToDLQ(ctx, msg); dlqErr != nil {
+		c.logger.Error(ctx, "Failed to send message to DLQ", zap.Error(dlqErr))
+	}
+	if commitErr := c.reader.CommitMessages(ctx, msg); commitErr != nil {
+		c.logger.Error(ctx, "Failed to commit message after DLQ", zap.Error(commitErr))
+	}
 }
 
 func (c *Consumer) sendToDLQ(ctx context.Context, msg kafkaGo.Message) error {

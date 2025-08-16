@@ -1,6 +1,3 @@
-////////////////////////////
-// internal/delivery/kafkadelivery/event.go
-
 package kafkadelivery
 
 import (
@@ -15,7 +12,6 @@ var validate *validator.Validate
 func init() {
 	validate = validator.New()
 
-	// ... customs validators
 }
 
 /////////////

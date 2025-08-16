@@ -1,6 +1,3 @@
-/////////////////////////////////
-// internal/repository/repository.go
-
 package repository
 
 import (
@@ -92,7 +89,9 @@ func (r *OrdersRepository) GetOrders(ctx context.Context, limit, offset int) ([]
 			o.id, o.order_uid, o.track_number, o.entry, 
 			d.name, d.phone, d.zip, d.city, d.address, d.region, d.email,
 			p.transaction, p.request_id, p.currency, p.provider, p.amount, p.payment_dt, 
-			p.bank, p.delivery_cost, p.goods_total, p.custom_fee
+			p.bank, p.delivery_cost, p.goods_total, p.custom_fee,
+			o.locale, o.internal_signature, o.customer_id, o.delivery_service,
+			o.shardkey, o.sm_id, o.date_created, o.oof_shard
 		FROM orders o
 		JOIN deliveries d ON o.id = d.order_id
 		JOIN payments p ON o.id = p.order_id
@@ -117,6 +116,8 @@ func (r *OrdersRepository) GetOrders(ctx context.Context, limit, offset int) ([]
 			&o.Payment.Transaction, &o.Payment.RequestID, &o.Payment.Currency, &o.Payment.Provider,
 			&o.Payment.Amount, &o.Payment.PaymentDT, &o.Payment.Bank, &o.Payment.DeliveryCost,
 			&o.Payment.GoodsTotal, &o.Payment.CustomFee,
+			&o.Locale, &o.InternalSignature, &o.CustomerID, &o.DeliveryService,
+			&o.Shardkey, &o.SmID, &o.DateCreated, &o.OofShard,
 		); err != nil {
 			return nil, 0, err
 		}

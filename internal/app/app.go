@@ -1,7 +1,3 @@
-///////////////////////
-
-// internal/app/app.go
-
 package app
 
 import (
@@ -13,13 +9,19 @@ import (
 	"wb_tech_level_zero/internal/config"
 	"wb_tech_level_zero/internal/gateway"
 
+	"wb_tech_level_zero/internal/cache"
 	"wb_tech_level_zero/internal/delivery/kafkadelivery"
 	"wb_tech_level_zero/internal/repository"
 	"wb_tech_level_zero/internal/service"
 	"wb_tech_level_zero/pkg/db"
 	"wb_tech_level_zero/pkg/logger"
 
+	"wb_tech_level_zero/pkg/redisclient"
+
+	_ "wb_tech_level_zero/docs"
+
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -29,11 +31,12 @@ type App struct {
 	httpServer    *gateway.Server
 	kafkaConsumer *kafkadelivery.Consumer
 	pgPool        *pgxpool.Pool
+	redisClient   *redis.Client
+	orderService  service.OrdersService
 	wg            sync.WaitGroup
 }
 
 func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*App, error) {
-
 	pgCfg := db.PostgresConfig{
 		Host:     cfg.PostgresHost,
 		Port:     cfg.PostgresPort,
@@ -45,16 +48,41 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*App, e
 	if err != nil {
 		return nil, err
 	}
-	orderRepo := repository.NewOrdersRepository(pgPool)
-	orderService := service.NewOrdersService(cfg, orderRepo)
 
-	httpServer, err := gateway.NewServer(ctx, cfg, orderService)
+	orderRepo := repository.NewOrdersRepository(pgPool)
+
+	redisCfg := redisclient.RedisConfig{
+		Host:     cfg.RedisHost,
+		Port:     cfg.RedisPort,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	}
+	redisClient, err := redisclient.New(ctx, redisCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	cacheCfg := cache.CacheConfig{
+		TTL: cfg.OrderTTLMinutes,
+	}
+	orderCache := cache.NewOrdersCache(redisClient, cacheCfg)
+
+	app := &App{
+		cfg:         cfg,
+		logger:      logger,
+		pgPool:      pgPool,
+		redisClient: redisClient,
+	}
+
+	app.orderService = service.NewOrdersService(cfg, orderRepo, orderCache, &app.wg, logger)
+
+	app.httpServer, err = gateway.NewServer(ctx, cfg, app.orderService)
 	if err != nil {
 		logger.Fatal(ctx, "failed to init gateway", zap.Error(err))
 		return nil, err
 	}
 
-	kafkaHandler := kafkadelivery.NewHandler(orderService, logger)
+	kafkaHandler := kafkadelivery.NewHandler(app.orderService, logger)
 	kafkaCfg := kafkadelivery.KafkaConfig{
 		Brokers:      strings.Split(cfg.KafkaBroker, ","),
 		GroupID:      cfg.KafkaGroupID,
@@ -64,19 +92,22 @@ func New(ctx context.Context, cfg *config.Config, logger logger.Logger) (*App, e
 		RetryDelayMs: cfg.KafkaRetryDelayMs,
 		TopicDLQ:     cfg.KafkaTopicDLQ,
 	}
-	kafkaConsumer := kafkadelivery.NewConsumer(kafkaCfg, kafkaHandler, logger)
+	app.kafkaConsumer = kafkadelivery.NewConsumer(kafkaCfg, kafkaHandler, logger)
 
-	return &App{
-		cfg:           cfg,
-		logger:        logger,
-		pgPool:        pgPool,
-		httpServer:    httpServer,
-		kafkaConsumer: kafkaConsumer,
-	}, nil
+	return app, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
 	ctx = logger.ContextWithLogger(ctx, a.logger)
+
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		a.logger.Info(ctx, "Warming up Redis order cache...")
+		if err := a.orderService.WarmOrdersCache(ctx); err != nil {
+			a.logger.Error(ctx, "Failed to warm up cache", zap.Error(err))
+		}
+	}()
 
 	a.wg.Add(1)
 	go func() {
@@ -100,6 +131,12 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) Stop(ctx context.Context) error {
+
+	a.logger.Info(ctx, "Closing Redis connection")
+	if err := a.redisClient.Close(); err != nil {
+		a.logger.Error(ctx, "Redis close error", zap.Error(err))
+	}
+
 	a.logger.Info(ctx, "Stopping HTTP server")
 	if err := a.httpServer.Shutdown(ctx); err != nil {
 		a.logger.Error(ctx, "HTTP server shutdown error", zap.Error(err))

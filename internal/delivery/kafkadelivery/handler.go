@@ -1,11 +1,10 @@
-////////////////////////////
-// internal/delivery/kafkadelivery/handler.go
-
 package kafkadelivery
 
 import (
 	"context"
+	"errors"
 
+	"wb_tech_level_zero/internal/orders"
 	"wb_tech_level_zero/pkg/logger"
 
 	"github.com/go-playground/validator/v10"
@@ -44,13 +43,19 @@ func (h Handler) HandleMessage(ctx context.Context, msg kafkaGo.Message) error {
 					zap.String("value", fe.Param()))
 			}
 		}
-		return err
+		return ErrKafkaNonRetryable
 	}
 
 	err = h.orderService.ProcessEventOrder(ctx, eventOrder)
 	if err != nil {
+		if errors.Is(err, orders.ErrOrderAlreadyExists) {
+			h.logger.Warn(ctx, "Order already exists, sending to DLQ",
+				zap.String("order_uid", eventOrder.OrderUID))
+			return ErrKafkaNonRetryable
+		}
+
 		h.logger.Error(ctx, "Failed to process order in service layer", zap.Error(err))
-		return err
+		return ErrKafkaRetryable
 	}
 
 	h.logger.Info(ctx, "Order processed successfully, order_uid: ", zap.String("order_uid", eventOrder.OrderUID))

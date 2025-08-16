@@ -1,6 +1,3 @@
-///////////////////////////////
-// internal/delivery/http/handler.go
-
 package httpapi
 
 import (
@@ -35,6 +32,14 @@ func NewHandlers(cfg *config.Config, orderService OrdersService) *Handlers {
 	}
 }
 
+// @Summary Getting orders by UID
+// @Description Getting orders by UID
+// @Tags orders
+// @Produce json
+// @Param uid path string true "UID заказа"
+// @Success 200 {object} dto.OrderDTO
+// @Failure 404 {string} string "Not Found"
+// @Router /order/{uid} [get]
 func (h *Handlers) GetOrderByUID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLoggerFromCtx(ctx)
@@ -63,8 +68,8 @@ func (h *Handlers) GetOrderByUID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderDTO := dto.OrderToDTO(dbOrder)
-
 	h.writeJSONResponse(ctx, w, http.StatusOK, orderDTO)
+
 }
 
 func (h *Handlers) GetOrders(w http.ResponseWriter, r *http.Request) {

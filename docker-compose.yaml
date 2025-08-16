@@ -24,7 +24,7 @@ services:
     ports:
       - "9092:9092"
       - "9093:9093"
-      - "9094:9094" # Новый порт для EXTERNAL listener
+      - "9094:9094" 
     environment:
       - KAFKA_ENABLE_KRAFT=yes
       - KAFKA_CFG_PROCESS_ROLES=broker,controller
@@ -58,5 +58,17 @@ services:
       kafka:
         condition: service_healthy  
 
+  redis:
+    image: redis:7
+    container_name: redis_container
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379" 
+    #volumes:  # для персистентности
+      #- redis_data:/data
+      #- ./.private/data/redis:/var/lib/postgresql/data
+    command: ["redis-server", "--save", "", "--appendonly", "no"] # Отключаем персистентность      
+
 volumes:
   kafka_data:
+  # redis_data: # для персистентности
