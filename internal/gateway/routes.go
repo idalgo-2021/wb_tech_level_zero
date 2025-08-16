@@ -1,7 +1,3 @@
-//////////////////
-
-// internal/api/routes.go
-
 package gateway
 
 import (
@@ -23,6 +19,7 @@ func NewRouter(ctx context.Context, ordersHandler *httpapi.Handlers) *mux.Router
 
 	r := mux.NewRouter()
 	r.Use(requestContextMiddleware)
+	r.Use(corsMiddleware)
 
 	// - - - - ORDERS
 	r.HandleFunc("/order/{order_uid}", ordersHandler.GetOrderByUID).Methods(http.MethodGet)
@@ -31,6 +28,19 @@ func NewRouter(ctx context.Context, ordersHandler *httpapi.Handlers) *mux.Router
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
 	return r
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func requestContextMiddleware(next http.Handler) http.Handler {

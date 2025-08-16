@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Orders</h1>
+  <form id="order-form">
+    <input 
+      type="text" 
+      id="order-id-input" 
+      placeholder="Order UID" 
+      style="width:200px;" 
+      autocomplete="off"
+    >
+    <button type="submit">get order</button>
+    <span id="form-error" class="error"></span>
+  </form>
+  <h2>Order JSON:</h2>
+  <pre id="details"></pre>
+
+  <script src="app.js"></script>
+</body>
+</html>
