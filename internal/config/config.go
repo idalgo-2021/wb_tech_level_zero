@@ -22,6 +22,7 @@ type Config struct {
 	OrderTTLMinutes int `env:"ORDER_CACHE_TTL_MINUTES" env-default:"5"`
 
 	DefaultPageLimit int `env:"DEFAULT_PAGE_LIMIT" env-default:"50"`
+	CacheWarmupSize  int `env:"CACHE_WARMUP_SIZE" env-default:"100"`
 
 	KafkaBroker        string `env:"KAFKA_BROKER" env-default:"localhost:9094"`
 	KafkaTopic         string `env:"KAFKA_TOPIC" env-default:"orders"`

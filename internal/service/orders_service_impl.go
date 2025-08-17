@@ -47,11 +47,11 @@ func (s *ordersService) GetOrderByUID(ctx context.Context, orderUID string) (*or
 
 	dbOrder, err := s.repo.GetOrderByUID(ctx, orderUID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get order from repository: %w", err)
 	}
 
-	// TO DO: М.б. сделать более прозрачно
-	return s.cacheAndReturn(key, dbOrder)
+	s.asyncCacheOrder(dbOrder)
+	return dbOrder, nil
 
 }
 
@@ -64,24 +64,23 @@ func (s *ordersService) GetOrders(ctx context.Context, params GetOrdersParams) (
 }
 
 func (s *ordersService) ProcessEventOrder(ctx context.Context, eo *kafkadelivery.EventOrder) error {
-	key := orderCachePrefix + eo.OrderUID
-
-	cached, err := s.cache.Get(ctx, key)
-	if err == nil && cached != nil {
+	cached, _ := s.cache.Get(ctx, orderCachePrefix+eo.OrderUID)
+	if cached != nil {
 		s.log.Info(ctx, "Order already exists (found in cache), skipping", zap.String("order_uid", eo.OrderUID))
 		return orders.ErrOrderAlreadyExists
 	}
 
-	order := s.mapEventOrderToDomain(eo)
+	order := mapEventOrderToDomain(eo)
 
-	err = s.repo.SaveOrder(ctx, &order)
+	err := s.repo.SaveOrder(ctx, &order)
 	if err != nil {
 		if errors.Is(err, orders.ErrOrderAlreadyExists) {
-			s.log.Info(ctx, "Order already exists, skipping", zap.String("order_uid", order.OrderUID))
+			s.log.Info(ctx, "Order already exists (found in DB), skipping save", zap.String("order_uid", order.OrderUID))
+
 			s.asyncCacheOrder(&order)
 			return orders.ErrOrderAlreadyExists
 		}
-		return err
+		return fmt.Errorf("failed to save order: %w", err)
 	}
 
 	s.asyncCacheOrder(&order)
@@ -93,7 +92,7 @@ func (s *ordersService) WarmOrdersCache(ctx context.Context) error {
 
 	// TO DO: Логика прогрева кэша(переработать после уточнения требований)
 
-	orders, _, err := s.repo.GetOrders(ctx, 100, 0)
+	orders, _, err := s.repo.GetOrders(ctx, s.cfg.CacheWarmupSize, 0)
 	if err != nil {
 		return fmt.Errorf("failed to load orders for warmup: %w", err)
 	}
@@ -110,11 +109,6 @@ func (s *ordersService) WarmOrdersCache(ctx context.Context) error {
 }
 
 // //////////////
-
-func (s *ordersService) cacheAndReturn(key string, order *orders.Order) (*orders.Order, error) {
-	s.asyncCacheWithData(key, order)
-	return order, nil
-}
 
 func (s *ordersService) asyncCacheOrder(order *orders.Order) {
 	key := orderCachePrefix + order.OrderUID
@@ -150,63 +144,4 @@ func (s *ordersService) cacheOrder(ctx context.Context, order *orders.Order) err
 	}
 
 	return nil
-}
-
-/////////////////
-
-func (s *ordersService) mapEventOrderToDomain(eo *kafkadelivery.EventOrder) orders.Order {
-	order := orders.Order{
-		OrderUID:          eo.OrderUID,
-		TrackNumber:       eo.TrackNumber,
-		Entry:             eo.Entry,
-		Locale:            eo.Locale,
-		InternalSignature: eo.InternalSignature,
-		CustomerID:        eo.CustomerID,
-		DeliveryService:   eo.DeliveryService,
-		Shardkey:          eo.Shardkey,
-		SmID:              eo.SmID,
-		DateCreated:       &eo.DateCreated,
-		OofShard:          eo.OofShard,
-		Delivery: orders.Delivery{
-			Name:    eo.Delivery.Name,
-			Phone:   eo.Delivery.Phone,
-			Zip:     eo.Delivery.Zip,
-			City:    eo.Delivery.City,
-			Address: eo.Delivery.Address,
-			Region:  eo.Delivery.Region,
-			Email:   eo.Delivery.Email,
-		},
-		Payment: orders.Payment{
-			Transaction:  eo.Payment.Transaction,
-			RequestID:    eo.Payment.RequestID,
-			Currency:     eo.Payment.Currency,
-			Provider:     eo.Payment.Provider,
-			Amount:       eo.Payment.Amount,
-			PaymentDT:    eo.Payment.PaymentDT,
-			Bank:         eo.Payment.Bank,
-			DeliveryCost: eo.Payment.DeliveryCost,
-			GoodsTotal:   eo.Payment.GoodsTotal,
-			CustomFee:    eo.Payment.CustomFee,
-		},
-	}
-
-	items := make([]orders.Item, len(eo.Items))
-	for i, it := range eo.Items {
-		items[i] = orders.Item{
-			ChrtID:      it.ChrtID,
-			TrackNumber: it.TrackNumber,
-			Price:       it.Price,
-			Rid:         it.Rid,
-			Name:        it.Name,
-			Sale:        it.Sale,
-			Size:        it.Size,
-			TotalPrice:  it.TotalPrice,
-			NmID:        it.NmID,
-			Brand:       it.Brand,
-			Status:      it.Status,
-		}
-	}
-	order.Items = items
-
-	return order
 }

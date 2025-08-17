@@ -14,9 +14,10 @@ services:
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      # - ./pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data # в спец каталог Докера: docker volume inspect wb_tech_level_zero_postgres_data
       - ./migrations:/docker-entrypoint-initdb.d
-
+      
   kafka:
     image: bitnami/kafka:3.5
     container_name: kafka
@@ -71,4 +72,5 @@ services:
 
 volumes:
   kafka_data:
+  postgres_data:
   # redis_data: # для персистентности
