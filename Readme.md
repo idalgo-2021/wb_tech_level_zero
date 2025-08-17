@@ -318,10 +318,12 @@ go mod tidy
 make up
 ```
 
-5. Создайте основной топик Kafka внутри контейнера(выполнить в корне проекта).
+5. Создайте основной топик Kafka внутри контейнера(выполнить в корне проекта команды).
 
 ```
 sudo docker exec -it kafka /bin/bash
+
+
 kafka-topics.sh --create --topic orders --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ```
 
