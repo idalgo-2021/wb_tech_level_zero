@@ -1,7 +1,6 @@
 ENV_FILE_PATH := ./.env
 COMPOSE_FLAGS = --env-file $(ENV_FILE_PATH)
 COMPOSE_DB_FILE = -f docker-compose.yaml
-# PGDATA_DIR := ./pgdata
 PGDATA_DIR := postgres_data
 
 # =============================================================================

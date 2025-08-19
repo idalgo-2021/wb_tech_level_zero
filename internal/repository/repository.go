@@ -78,6 +78,8 @@ func (r *OrdersRepository) GetOrderByUID(ctx context.Context, orderUID string) (
 
 func (r *OrdersRepository) GetOrders(ctx context.Context, limit, offset int) ([]*orders.Order, int, error) {
 
+	// TO DO: Подумать над оптимизацией
+
 	const countQuery = `SELECT COUNT(*) FROM orders;`
 	var total int
 	if err := r.db.QueryRow(ctx, countQuery).Scan(&total); err != nil {
@@ -105,7 +107,8 @@ func (r *OrdersRepository) GetOrders(ctx context.Context, limit, offset int) ([]
 	}
 	defer rows.Close()
 
-	var ordersList []*orders.Order
+	ordersMap := make(map[int]*orders.Order)
+	var orderIDs []int
 
 	for rows.Next() {
 		var o orders.Order
@@ -121,10 +124,53 @@ func (r *OrdersRepository) GetOrders(ctx context.Context, limit, offset int) ([]
 		); err != nil {
 			return nil, 0, err
 		}
-		ordersList = append(ordersList, &o)
+
+		o.Items = []orders.Item{}
+		ordersMap[o.ID] = &o
+		orderIDs = append(orderIDs, o.ID)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
 	}
 
-	// without Items
+	if len(orderIDs) == 0 {
+		return []*orders.Order{}, total, nil
+	}
+
+	// TO DO: Подумать над оптимизацией
+
+	const itemsQuery = `
+		SELECT order_id, chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status
+		FROM items
+		WHERE order_id = ANY($1);
+	`
+	itemRows, err := r.db.Query(ctx, itemsQuery, orderIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer itemRows.Close()
+
+	for itemRows.Next() {
+		var item orders.Item
+		var orderID int
+		if err := itemRows.Scan(
+			&orderID, &item.ChrtID, &item.TrackNumber, &item.Price, &item.Rid, &item.Name,
+			&item.Sale, &item.Size, &item.TotalPrice, &item.NmID, &item.Brand, &item.Status,
+		); err != nil {
+			return nil, 0, err
+		}
+		if order, ok := ordersMap[orderID]; ok {
+			order.Items = append(order.Items, item)
+		}
+	}
+	if err = itemRows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	ordersList := make([]*orders.Order, len(orderIDs))
+	for i, id := range orderIDs {
+		ordersList[i] = ordersMap[id]
+	}
 
 	return ordersList, total, nil
 }
